@@ -6,7 +6,7 @@ This repository contains the code and the reproduction scripts of the **multi-ob
 > *cg2o: Constrained Factor Graph Optimization via an Infeasible-Start Primal–Dual Interior-Point Method*
 > (Sec. VI of the paper)
 
-The solver itself, **cg2o**, is a separate library (https://github.com/snt-arg/cg2o), an extension of g2o. This
+The solver itself, **cg2o**, is a separate library (https://anonymous.4open.science/r/cg2o/), an extension of g2o. This
 repository builds it, formulates the MACC problem as a constrained factor graph, runs it in a closed loop over a
 full driving cycle, and compares it with other solvers on exactly the same optimization problems.
 
