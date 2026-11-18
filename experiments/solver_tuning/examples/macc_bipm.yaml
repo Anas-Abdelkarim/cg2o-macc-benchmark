@@ -1,0 +1,101 @@
+# Edit binary/config paths. Strict gates may yield no winner; inspect failures before changing thresholds.
+method: tpe
+experiment:
+  type: macc
+  binary: ../../MACC/build/macc/bin/macc_run
+  config: ../../MACC/config/config.yaml
+  target: bipm
+  driver: ispd
+  max_iterations: 120
+  reference_residual: 0.0001
+  require_reference_convergence: true
+  init: feasible
+parameters:
+- key: bipm_settings.kappa_initial
+  kind: log
+  default: 0.5
+  low: 0.001
+  high: 100.0
+  grid:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 0.5
+  - 1.0
+  - 2.0
+  - 5.0
+  - 10.0
+  - 50.0
+- key: bipm_settings.kappa_final
+  kind: log
+  default: 1500.0
+  low: 100.0
+  high: 20000.0
+  grid:
+  - 300.0
+  - 500.0
+  - 1000.0
+  - 1500.0
+  - 3000.0
+  - 5000.0
+  - 10000.0
+- key: bipm_settings.kappa_update_factor
+  kind: log
+  default: 8.0
+  low: 1.5
+  high: 50.0
+  grid:
+  - 2.0
+  - 3.0
+  - 4.0
+  - 6.0
+  - 8.0
+  - 10.0
+  - 15.0
+  - 20.0
+  - 30.0
+- key: bipm_settings.lagrange_multiplier_initial_eq
+  kind: float
+  default: 0.0
+  low: -1000.0
+  high: 1000.0
+  grid:
+  - -1000.0
+  - -100.0
+  - -10.0
+  - 0.0
+  - 10.0
+  - 100.0
+  - 1000.0
+  doc: initial equality multipliers, BIPM only (read by the C++ controller since 2026-10-26)
+objective:
+  metric: iterations
+  mode: relative
+constraints:
+- metric: eq_max
+  limit: 0.0001
+- metric: ineq_max
+  limit: 0.0001
+- metric: fail_fraction
+  limit: 0
+- metric: hit_fraction
+  limit: 0
+- metric: cost_excess_mean
+  limit: 0.0001
+settings:
+  cases:
+  - 3
+  - 15
+  - 30
+  screening_fidelity: 300
+  validation_fidelity: 0
+  validation_repeats: 3
+  validate_top: 5
+  jobs: 2
+  seed: 1
+  strategy_options:
+    startup: 30
+relations:
+- left: bipm_settings.kappa_initial
+  right: bipm_settings.kappa_final
+  op: <=

@@ -1,0 +1,6 @@
+numpy>=1.21
+matplotlib>=3.5
+PyYAML>=5.4
+pandas>=1.3        # paper/analysis
+scipy>=1.8         # experiments/convergence_check
+# the tuning library has its own isolated environment: scripts/setup_tuning_env.sh (optuna 4.x)

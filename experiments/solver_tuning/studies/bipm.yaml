@@ -1,0 +1,119 @@
+# Paths are relative to THIS file. The base configuration (config/config.yaml) is copied into the study folder when a study
+# starts, so editing config.yaml afterwards neither changes nor blocks a running / resumed study.
+# Fixed accuracy: no tolerance options (tol, compl_inf_tol, ...) are tuned; they stay as in config.yaml. A gain therefore
+# cannot come from solving less accurately. Constraints apply to every run: residuals, solver failures, steps at the limit, cost.
+# BIPM needs a strictly feasible start (init: feasible). NOTE: the feasible start still has an open reproducibility bug
+# (see 'Reproducibility' in docs/EXPERIMENTS.md): treat BIPM results with care until it is fixed.
+# RELAXED variant (default for tuning): BIPM reaches the iteration limit in some steps by design, so steps at the limit are
+# penalised in the objective instead of rejected; a few failed steps are tolerated. See bipm_strict.yaml for the all-or-nothing gates.
+# Gate cost_excess_mean <= 0.02: BIPM's non-converged steps cost about 0.4% on average over a full cycle (unchanged BIPM), (1.1% at the 300-step screening length) so 0.1% would reject
+# even the baseline. Steps at the limit are penalised in the objective (weight 2) instead of rejected.
+method: tpe
+experiment:
+  type: macc
+  binary: ../../../build/macc/bin/macc_run
+  config: ../../../config/config.yaml
+  target: bipm
+  driver: ispd
+  init: feasible
+  max_iterations: 120
+  reference_residual: 0.001
+  require_reference_convergence: false
+parameters:
+- key: bipm_settings.kappa_initial
+  kind: log
+  low: 0.001
+  high: 100.0
+  default: 0.5
+  grid:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 0.5
+  - 1.0
+  - 2.0
+  - 5.0
+  - 10.0
+  - 50.0
+- key: bipm_settings.kappa_final
+  kind: log
+  low: 1490.0
+  high: 20000.0
+  default: 1500.0
+  grid:
+  - 1490.0
+  - 1700.0
+  - 2000.0
+  - 2500.0
+  - 3000.0
+  - 5000.0
+  - 10000.0
+- key: bipm_settings.kappa_update_factor
+  kind: log
+  low: 1.5
+  high: 50.0
+  default: 8.0
+  grid:
+  - 2.0
+  - 3.0
+  - 4.0
+  - 6.0
+  - 8.0
+  - 10.0
+  - 15.0
+  - 20.0
+  - 30.0
+- key: bipm_settings.lagrange_multiplier_initial_eq
+  kind: float
+  low: -1000.0
+  high: 1000.0
+  default: 0.0
+  grid:
+  - -1000.0
+  - -100.0
+  - -10.0
+  - 0.0
+  - 10.0
+  - 100.0
+  - 1000.0
+  doc: initial equality multipliers (BIPM only; overrides general_settings)
+- key: bipm_settings.num_inner_iterations_max
+  kind: int
+  low: 5
+  high: 100
+  default: 10
+  doc: maximum inner (line-search / centering) iterations per outer iteration
+- key: bipm_settings.alpha_backtracking
+  kind: float
+  low: 0.05
+  high: 0.95
+  default: -1.0
+  optional: true
+  doc: backtracking factor in (0,1); absent = the cg2o default -1
+objective:
+  metric: iterations
+  mode: relative
+  penalties:
+    hit_fraction: 2.0
+constraints:
+- metric: fail_fraction
+  limit: 0.02
+- metric: cost_excess_mean
+  limit: 0.02
+settings:
+  cases:
+  - 3
+  - 15
+  - 30
+  screening_fidelity: 300
+  validation_fidelity: 0
+  validation_repeats: 1
+  validate_top: 5
+  jobs: 4
+  seed: 1
+  strategy_options:
+    startup: 40
+relations:
+- left: bipm_settings.kappa_initial
+  right: bipm_settings.kappa_final
+  op: <=

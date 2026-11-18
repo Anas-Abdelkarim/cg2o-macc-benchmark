@@ -1,0 +1,45 @@
+MACC/
+├── CMakeLists.txt
+├── README.md  INSTALL.md  QUICKSTART.md
+├── cmake/                         CMake modules: options, dependencies, FindIPOPT (pkg-config), summary
+├── config/
+│   ├── config.yaml                every setting; override with  --set key=value
+│   └── paper_reference.yaml       numbers of paper Tables V and VI used in the reports
+├── MACC/                          all C++ code of the application
+│   ├── include/macc/              public headers, included as <macc/module/file.hpp>
+│   │   ├── core/                      config, table, stats, timer, run_info
+│   │   ├── mpc/                       parameters, driving cycle, closed-loop plant
+│   │   ├── nlp/                       macc_nlp.hpp      the MACC problem as plain functions (exact derivatives)
+│   │   ├── fg/                        factor graph: vertices, edges/, formulation
+│   │   ├── solvers/                   catalogue of the 19 linear solvers
+│   │   ├── backends/                  controller.hpp (common interface), factory.hpp
+│   │   └── experiment/                closed-loop driver interface
+│   ├── src/                           one CMake library per module, same sub-folders as include/macc
+│   │   ├── core/  mpc/  nlp/  fg/edges/  solvers/
+│   │   ├── backends/cg2o/             ISPD-IPM, BIPM, AL through the cg2o API
+│   │   ├── backends/ipopt/            native IPOPT (TNLP) + ipopt_stub.cpp when IPOPT is absent
+│   │   ├── experiment/                setup (config -> controllers), closed loop, report
+│   │   └── apps/macc_run.cpp          command-line program  ->  build/macc/bin/macc_run
+├── experiments/                   Python layer on top of macc_run
+│   ├── run_experiment.py          fig2 | fig3 | linear-solvers | single | replot | list-solvers
+│   ├── requirements.txt
+│   └── macc_exp/                  presets, runner, figures, report, linear-solver study, paper numbers
+├── scripts/
+│   ├── build_externals.sh         dispatcher: g2o, cg2o, ipopt
+│   ├── build_externals/           one script per external + _common.sh
+│   ├── build_workspace.sh         configure + build MACC
+│   ├── run_experiment.sh          one-command experiments (wrapper of experiments/run_experiment.py)
+│   ├── rebuild_cg2o.sh            incremental cg2o + MACC rebuild
+│   ├── setup_env.sh               source: paths of the local externals
+│   ├── build_status.sh  check_build_env.sh  clean_build.sh  test_build_workflows.sh
+├── tests/
+│   ├── unit/test_nlp_derivatives.cpp          Jacobian / Hessian against finite differences
+│   └── integration/test_solver_consistency.cpp   ISPD vs IPOPT on the same problem
+├── docs/                          ARCHITECTURE.md  EXPERIMENTS.md  BUILD_WORKFLOWS.md
+├── legacy/                        replaced code, kept for reference, not built
+├── results/                       GENERATED:  experiments/<stamp>_<name>/   runs/<stamp>_<label>/
+├── build/                         GENERATED:  macc/ (application), externals/ (g2o, cg2o, ...)
+├── install/externals/             GENERATED:  g2o, cg2o, ipopt
+└── externals/                     sources of g2o / cg2o when they have to be cloned
+
+cg2o source order: CG2O_DIR -> <MACC>/../../unconstrained (CG2O_LOCAL_DIR) -> externals/cg2o -> git clone (branch dev)

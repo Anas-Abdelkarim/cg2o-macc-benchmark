@@ -1,0 +1,52 @@
+# Edit binary/config paths, relative to THIS file. Install with pip install '.[bo]'.
+method: tpe
+experiment:
+  type: macc
+  binary: ../../MACC/build/macc/bin/macc_run
+  config: ../../MACC/config/config.yaml
+  target: ipopt_warm
+  driver: ispd
+  max_iterations: 120
+  reference_residual: 0.0001
+  require_reference_convergence: true
+parameters:
+  # Accuracy tolerances deliberately stay in config.yaml, outside this search.
+  - key: ipopt_settings.options.mu_strategy
+    kind: cat
+    choices: [monotone, adaptive]
+    default: adaptive
+  - key: ipopt_settings.options.mu_init
+    kind: log
+    low: 0.0001
+    high: 10
+    default: 0.1
+    active_if: {ipopt_settings.options.mu_strategy: [monotone]}
+  - key: ipopt_settings.options.adaptive_mu_globalization
+    kind: cat
+    choices: [obj-constr-filter, kkt-error, never-monotone-mode]
+    default: obj-constr-filter
+    active_if: {ipopt_settings.options.mu_strategy: [adaptive]}
+  - {key: ipopt_settings.options.bound_push, kind: log, low: 0.000001, high: 0.1, default: 0.01}
+  - {key: ipopt_settings.options.bound_frac, kind: log, low: 0.000001, high: 0.5, default: 0.01}
+  - {key: ipopt_settings.options.nlp_scaling_method, kind: cat, choices: [none, gradient-based], default: none}
+  - {key: ipopt_settings.options.fast_step_computation, kind: cat, choices: ['no', 'yes'], default: 'no'}
+  - {key: ipopt_settings.options.min_refinement_steps, kind: int, low: 0, high: 2, default: 0}
+  - {key: ipopt_settings.options.mu_min, kind: log, low: 0.00000000001, high: 0.0001, optional: true}
+objective:
+  metric: iterations
+  mode: relative
+constraints:
+  - {metric: eq_max, limit: 0.0001}
+  - {metric: ineq_max, limit: 0.0001}
+  - {metric: fail_fraction, limit: 0}
+  - {metric: hit_fraction, limit: 0}
+  - {metric: cost_excess_mean, limit: 0.0001}
+settings:
+  cases: [3, 15, 30]
+  screening_fidelity: 300
+  validation_fidelity: 0  # adapter explicitly writes loop_size=0
+  validation_repeats: 3
+  validate_top: 5
+  jobs: 2              # total concurrent simulations <=2; use 1 for timing
+  seed: 1
+  strategy_options: {startup: 30}

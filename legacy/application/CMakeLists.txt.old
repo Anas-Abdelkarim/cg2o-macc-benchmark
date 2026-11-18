@@ -1,0 +1,148 @@
+
+find_package(yaml-cpp REQUIRED)
+
+set(EXC "mpc_space")
+set(EXEC_NAME "${EXC}_exc")  # mpc_space_exc 
+ 
+#include the the header fiels 
+include_directories(${PROJECT_SOURCE_DIR}/include/macc/application)
+
+add_executable(${EXEC_NAME} ${PROJECT_SOURCE_DIR}/src/application/main.cpp)
+# Match the cg2o dev adaptive-cruise-control reference example.
+set(MPC_CG2O_OPTIMIZER "ISPD" CACHE STRING "cg2o optimizer: ISPD, AL, BIPM")
+set_property(CACHE MPC_CG2O_OPTIMIZER PROPERTY STRINGS ISPD AL BIPM)
+if(NOT MPC_CG2O_OPTIMIZER MATCHES "^(ISPD|AL|BIPM)$")
+  message(FATAL_ERROR "Invalid MPC_CG2O_OPTIMIZER=${MPC_CG2O_OPTIMIZER}; use ISPD, AL or BIPM")
+endif()
+target_compile_definitions(${EXEC_NAME} PRIVATE "USE_${MPC_CG2O_OPTIMIZER}")
+
+option(MPC_FEASIBLE_INITIALIZATION "Feasible-start initialization for MPC" OFF)
+option(MPC_USE_NUMERICAL_JACOBIANS "Use numerical MPC Jacobians" OFF)
+option(CG2O_DEBUG_LINEAR_SOLVER "cg2o linear solver debugging" OFF)
+if(MPC_FEASIBLE_INITIALIZATION)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_FEASIBLE_INITIALIZATION=1)
+else()
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_FEASIBLE_INITIALIZATION=0)
+endif()
+if(MPC_USE_NUMERICAL_JACOBIANS)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_NUMERICAL_JACOBIANS=1)
+  target_compile_definitions(mpc_cg2o_lib PUBLIC MPC_USE_NUMERICAL_JACOBIANS=1)
+else()
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_NUMERICAL_JACOBIANS=0)
+  target_compile_definitions(mpc_cg2o_lib PUBLIC MPC_USE_NUMERICAL_JACOBIANS=0)
+endif()
+if(CG2O_DEBUG_LINEAR_SOLVER)
+  target_compile_definitions(${EXEC_NAME} PRIVATE CG2O_DEBUG_LINEAR_SOLVER=1)
+else()
+  target_compile_definitions(${EXEC_NAME} PRIVATE CG2O_DEBUG_LINEAR_SOLVER=0)
+endif()
+
+# Optional solver headers and link libraries must be gated on exported targets.
+if(TARGET cg2o::solvers_eigen)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_SOLVERS_EIGEN)
+  target_link_libraries(${EXEC_NAME} PRIVATE cg2o::solvers_eigen)
+  message(STATUS "MACC: cg2o Eigen solver extensions found")
+endif()
+if(TARGET cg2o::solver_eigen_umfpack)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_SOLVERS_UMFPACK)
+  target_link_libraries(${EXEC_NAME} PRIVATE cg2o::solver_eigen_umfpack)
+  message(STATUS "MACC: cg2o UMFPACK solver found (config linear_solver.type=14)")
+else()
+  message(WARNING "cg2o UMFPACK missing: config linear_solver.type=14 will not work; use 3 or install UMFPACK solver")
+endif()
+if(TARGET cg2o::solver_eigen_pardiso)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_SOLVERS_PARDISO)
+  target_link_libraries(${EXEC_NAME} PRIVATE cg2o::solver_eigen_pardiso)
+endif()
+if(TARGET g2o::solver_cholmod AND TARGET g2o::solver_csparse)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_USE_G2O_SOLVERS)
+  target_link_libraries(${EXEC_NAME} PRIVATE g2o::solver_cholmod g2o::solver_csparse)
+endif()
+message(STATUS "MACC cg2o optimizer: ${MPC_CG2O_OPTIMIZER}")
+
+
+  
+target_link_libraries(${EXEC_NAME} PRIVATE
+  ${G2O_LIBRARIES}
+  Eigen3::Eigen
+  fmt::fmt
+  ${MACC_CG2O_TARGET}
+  mpc_cg2o_lib
+  OpenMP::OpenMP_CXX
+  ${Python3_LIBRARIES}
+  yaml-cpp
+)
+
+
+if(MPC_AMPL_LANGUAGE)
+  target_compile_definitions(${EXEC_NAME} PRIVATE MPC_AMPL_LANGUAGE)
+  target_link_libraries(${EXEC_NAME} PRIVATE mpc_space_ampl_lib)  # <- your AMPL interface/config lib
+endif()
+
+if(MPC_CASADI_TOOL)
+   target_compile_definitions(${EXEC_NAME} PRIVATE MPC_CASADI_TOOL)
+  target_link_libraries(${EXEC_NAME} PRIVATE mpc_space_casadi_lib)  # <- your CasADi interface/config lib
+
+endif()
+
+
+
+if(MACC_BUILD_OPENLOOP)
+### openloop 
+add_executable(${EXEC_NAME}_openloop ${PROJECT_SOURCE_DIR}/src/application/open_loop.cpp)
+ 
+
+target_link_libraries(${EXEC_NAME}_openloop PRIVATE
+  ${G2O_LIBRARIES}
+  Eigen3::Eigen
+  fmt::fmt
+  ${MACC_CG2O_TARGET}
+  mpc_cg2o_lib
+  OpenMP::OpenMP_CXX
+  ${Python3_LIBRARIES}
+  yaml-cpp
+  $<$<BOOL:${MPC_AMPL_LANGUAGE}>:mpc_space_ampl_lib>
+)
+
+
+
+
+endif()
+
+# save the executable to the bin 
+set_target_properties(${EXEC_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+)
+
+if(MACC_BUILD_OPENLOOP)
+set_target_properties(${EXEC_NAME}_openloop PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/bin"
+    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin"
+)
+
+endif()
+
+set(DEFAULT_CONFIG_PATH
+  "${PROJECT_SOURCE_DIR}/config/config.yaml"
+)
+
+target_compile_definitions(${EXEC_NAME} PRIVATE
+  DEFAULT_CONFIG_PATH="${DEFAULT_CONFIG_PATH}"
+)
+
+#add_custom_command(TARGET ${EXEC_NAME} POST_BUILD
+#  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#          "${DEFAULT_CONFIG_PATH}"
+#          "$<TARGET_FILE_DIR:${EXEC_NAME}>/config.yaml"
+#)
+
+
+
+

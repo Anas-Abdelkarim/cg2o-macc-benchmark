@@ -1,0 +1,107 @@
+# Paths are relative to THIS file. The base configuration (config/config.yaml) is copied into the study folder when a study
+# starts, so editing config.yaml afterwards neither changes nor blocks a running / resumed study.
+# Fixed accuracy: no tolerance options (tol, compl_inf_tol, ...) are tuned; they stay as in config.yaml. A gain therefore
+# cannot come from solving less accurately. Constraints apply to every run: residuals, solver failures, steps at the limit, cost.
+# BIPM needs a strictly feasible start (init: feasible). NOTE: the feasible start still has an open reproducibility bug
+# (see 'Reproducibility' in docs/EXPERIMENTS.md): treat BIPM results with care until it is fixed.
+# STRICT variant: no step may reach the limit or fail, residuals must stay below 1e-4. The unchanged BIPM usually fails these gates.
+method: tpe
+experiment:
+  type: macc
+  binary: ../../../build/macc/bin/macc_run
+  config: ../../../config/config.yaml
+  target: bipm
+  driver: ispd
+  init: feasible
+  max_iterations: 120
+  reference_residual: 0.0001
+  require_reference_convergence: true
+parameters:
+- key: bipm_settings.kappa_initial
+  kind: log
+  low: 0.001
+  high: 100.0
+  default: 0.5
+  grid:
+  - 0.001
+  - 0.01
+  - 0.1
+  - 0.5
+  - 1.0
+  - 2.0
+  - 5.0
+  - 10.0
+  - 50.0
+- key: bipm_settings.kappa_final
+  kind: log
+  low: 100.0
+  high: 20000.0
+  default: 1500.0
+  grid:
+  - 300.0
+  - 500.0
+  - 1000.0
+  - 1500.0
+  - 3000.0
+  - 5000.0
+  - 10000.0
+- key: bipm_settings.kappa_update_factor
+  kind: log
+  low: 1.5
+  high: 50.0
+  default: 8.0
+  grid:
+  - 2.0
+  - 3.0
+  - 4.0
+  - 6.0
+  - 8.0
+  - 10.0
+  - 15.0
+  - 20.0
+  - 30.0
+- key: bipm_settings.lagrange_multiplier_initial_eq
+  kind: float
+  low: -1000.0
+  high: 1000.0
+  default: 0.0
+  grid:
+  - -1000.0
+  - -100.0
+  - -10.0
+  - 0.0
+  - 10.0
+  - 100.0
+  - 1000.0
+  doc: initial equality multipliers, BIPM only (read by the C++ controller since 2026-10-26)
+objective:
+  metric: iterations
+  mode: relative
+constraints:
+- metric: eq_max
+  limit: 0.0001
+- metric: ineq_max
+  limit: 0.0001
+- metric: fail_fraction
+  limit: 0
+- metric: hit_fraction
+  limit: 0
+- metric: cost_excess_mean
+  limit: 0.0001
+settings:
+  cases:
+  - 3
+  - 15
+  - 30
+  screening_fidelity: 300
+  validation_fidelity: 0
+  validation_repeats: 1
+  validate_top: 5
+  jobs: 4
+  seed: 1
+  strategy_options:
+    startup: 40
+relations:
+- left: bipm_settings.kappa_initial
+  right: bipm_settings.kappa_final
+  op: <=

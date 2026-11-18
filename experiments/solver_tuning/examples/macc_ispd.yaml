@@ -1,0 +1,129 @@
+# Edit binary/config paths. Strict gates may yield no winner; inspect failures before changing thresholds.
+method: tpe
+experiment:
+  type: macc
+  binary: ../../MACC/build/macc/bin/macc_run
+  config: ../../MACC/config/config.yaml
+  target: ispd
+  driver: ipopt_warm
+  max_iterations: 120
+  reference_residual: 0.0001
+  require_reference_convergence: true
+  init: fixed
+parameters:
+- key: ispd_settings.step_size_strategy
+  kind: cat
+  default: 0
+  choices:
+  - 0
+  - 1
+  - 2
+  - 3
+- key: ispd_settings.ineq_backtracking_step_min
+  kind: float
+  default: 1.0
+  low: 0.05
+  high: 1.0
+- key: ispd_settings.aux_backtracking_step_min
+  kind: float
+  default: 0.8
+  low: 0.05
+  high: 1.0
+- key: ispd_settings.kappa_initial
+  kind: log
+  default: 0.001
+  low: 0.0001
+  high: 10.0
+- key: ispd_settings.update_kappa_strategy
+  kind: cat
+  default: 0
+  choices:
+  - 0
+  - 1
+  - 2
+  - 3
+- key: ispd_settings.kappa_update_factor
+  kind: log
+  default: 15.0
+  low: 1.5
+  high: 100.0
+- key: ispd_settings.kappa_final
+  kind: log
+  default: 1500.0
+  low: 100.0
+  high: 100000.0
+- key: ispd_settings.tau
+  kind: float
+  default: 1.4
+  low: 1.01
+  high: 4.0
+- key: ispd_settings.limit_kappa_final
+  kind: cat
+  default: 1
+  choices:
+  - 0
+  - 1
+- key: ispd_settings.slack_variable_initial_ineq
+  kind: log
+  default: 10.0
+  low: 0.1
+  high: 1000.0
+- key: ispd_settings.lagrange_multiplier_initial_ineq
+  kind: log
+  default: 10.0
+  low: 0.1
+  high: 1000.0
+- key: ispd_settings.ineq_prediction_param
+  kind: float
+  default: 1.0
+  low: 0.1
+  high: 2.0
+- key: ispd_settings.aux_scaling_factor
+  kind: float
+  default: 0.2
+  low: 0.01
+  high: 0.9
+- key: ispd_settings.aux_correction_value
+  kind: log
+  default: 1.0
+  low: 0.1
+  high: 10.0
+- key: general_settings.num_inner_iterations_max
+  kind: int
+  default: 10
+  low: 1
+  high: 20
+- key: cg2o.equality_regularization
+  kind: cat
+  default: 0.0
+  choices:
+  - 0.0
+  - 1.0e-08
+  - 1.0e-06
+objective:
+  metric: iterations
+  mode: relative
+constraints:
+- metric: eq_max
+  limit: 0.0001
+- metric: ineq_max
+  limit: 0.0001
+- metric: fail_fraction
+  limit: 0
+- metric: hit_fraction
+  limit: 0
+- metric: cost_excess_mean
+  limit: 0.0001
+settings:
+  cases:
+  - 3
+  - 15
+  - 30
+  screening_fidelity: 300
+  validation_fidelity: 0
+  validation_repeats: 3
+  validate_top: 5
+  jobs: 2
+  seed: 1
+  strategy_options:
+    startup: 30

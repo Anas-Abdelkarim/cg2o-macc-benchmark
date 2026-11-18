@@ -1,0 +1,164 @@
+# =============================================================================
+#  MACC default configuration
+#  Every value can be overridden on the command line:  macc_run --set key=value
+#  Every run stores the fully resolved copy (config_resolved.yaml) in its folder.
+# =============================================================================
+
+experiment:
+  label: ""                  # appended to the time-stamped run folder name
+  output_dir: results/runs   # relative paths are relative to the MACC source tree
+  solvers: [ispd]            # any of: ispd, bipm, al, ipopt  (several = same problem at every step)
+  driver: ""                 # solver whose input drives the plant (default: first in the list)
+  progress_every: 100        # console progress line every N MPC steps
+
+mpc:
+  horizon: 3                 # prediction horizon N (paper: 3, 15, 30)
+  loop_size: 0               # number of MPC steps; 0 = whole driving cycle (3863 steps, Ts = 0.1 s)
+  number_of_iterations: 120  # maximum solver iterations (paper Table IV: 120)
+  run_times: 1               # solves per MPC step for timing; paper averages >10 runs w/o outliers
+  init_mode: fixed           # fixed: every variable = init_value (paper, all solvers except BIPM)
+                             # feasible: strictly feasible projection (needed by BIPM, Fig. 2 / Table V)
+  init_value: 10.0
+
+# Equality-constrained algorithm used with the inequality algorithm (kept for compatibility)
+unconstrained_solver:
+  type: "GN"                 # GN / LV / DL
+
+linear_solver:
+  type: 18              # id or key, see `macc_run --list-solvers` (14 umfpack = paper default, ~4x slower)
+                             #  0 cholmod, 1 eigen_ldlt, 2 csparse, 3 eigen, 4 dense, 5 pcg,
+                             #  6 eigen_lu, 7 eigen_qr, 8 eigen_svd, 9 eigen_bicgstab,
+                             # 10 eigen_dense_qr, 11 eigen_dense_full_lu, 12 eigen_dense_partial_lu,
+                             # 13 pardiso, 14 umfpack (paper default), 15 eigen_lscg,
+                             # 16 cholmod_fast, 17 umfpack_fast, 18 qdldlt   (cg2o dev)
+
+inequality_algorithm: "ispd" # used only when experiment.solvers is empty
+equality_algorithm: "gn"
+
+cg2o:
+  termination_criterion: 1   # 0 UpdateNorm, 1 NewtonDecrement, 2 GradientNorm
+  equality_regularization: 0  # sigma of the quasi-definite KKT system (0 = exact KKT matrix).
+                                # 1e-8 .. 1e-6 lets LDL^T-type solvers handle the equality rows.
+  # epsilon_convergence: 1e-2   # cg2o default; 0 = never converge, i.e. always run max_iterations
+
+general_settings:
+  verbose: 0
+  num_inner_iterations_max: 25
+  alpha_backtracking: -1
+  lagrange_multiplier_initial_eq: -100
+  rho_initial_eq: 0.5        # augmented-Lagrangian (al) penalty: initial / max / update factor
+  rho_max_eq: 5e5
+  rho_update_factor_eq: 20
+
+# Barrier IPM of ref. [6] of the paper (needs mpc.init_mode: feasible)
+bipm_settings:
+  # tuned winner (results/tuning/bipm, trial 2003, full cycle N = 3/15/30: score 0.78 vs 1.04 for .05 / 1500 / 8.5)
+  kappa_initial: .5
+  kappa_final: 1500.0
+  kappa_update_factor: 8.0
+  lagrange_multiplier_initial_eq: 0.0
+  num_inner_iterations_max: 5
+  alpha_backtracking: 0.96
+   
+
+
+# ISPD-IPM, the proposed solver. Values = paper Table IV.
+ispd_settings:
+  step_size_strategy: 0          # 0: min(ineq_step,aux_step), 1: average, 2: ineq_step, 3: aux_step, 4: constant 1.0
+  ineq_backtracking_step_min: 1.0    # zeta_ineq^min
+  aux_backtracking_step_min: 0.8     # zeta_aux^min
+  _init_kappa_strategy: 0        # 0: constant = kappa_initial, 1: based on duality gap
+  kappa_initial: 1e-3            # kappa_0
+  update_kappa_strategy: 0       # 0: t>=t_memory, 1: t>=kappa_initial, 2: duality gap, 3: fixed nu
+  kappa_update_factor: 15.0      # nu
+  kappa_final: 1500.0
+  tau: 1.4
+  limit_kappa_final: 1
+  init_slack_strategy: 0         # 0: max(-g(x0), slack_initial) ...
+  slack_variable_initial_ineq: 10.0   # s_pos
+  init_lagrange_strategy: 0
+  lagrange_multiplier_initial_ineq: 10.0   # lambda_pos
+  ineq_prediction_strategy: 0    # 0: linear prediction
+  ineq_prediction_step_strategy: 0
+  ineq_prediction_param: 1.0     # zeta_pred
+  keep_aux_positive_strategy: 0  # 0: scaling
+  aux_scaling_factor: 0.2        # beta
+  aux_correction_value: 1.0
+  feas_tol: 1e-3
+
+# Native IPOPT (C++ TNLP, exact derivatives). Passed to IPOPT as an option file.
+# Paper: IPOPT with default settings, max 120 iterations, initial guess 10.
+ipopt_settings:
+  # Linear solver of IPOPT. false: MUMPS (open source, always available).
+  # true: an HSL solver (needs the licensed Coin-HSL library, see externals/README.md). The paper's
+  # Table V uses MA57. An explicit ipopt_settings.options.linear_solver / hsllib takes precedence.
+  use_hsl: false
+  hsl_solver: ma57
+  hsl_library: ""                     # empty: install/externals/hsl/lib/.../libcoinhsl.so
+  single_variable_rows_as_bounds: 1   # 1: f_t / f_b limit rows are variable bounds
+                                      #    (the paper's IPOPT model); 0: all 16 rows/stage are general constraints
+  # Initial duals of every solve: "ipopt" = IPOPT chooses them (bound_mult_init_*, constr_mult_init_max, least_square_init_duals);
+  # "fixed" = fixed numbers like cg2o (equality rows 0, inequality rows 10, finite variable bounds 10). "fixed" switches
+  # warm_start_init_point on and copies bound_push/bound_frac/slack_bound_* to the warm_start_* options.
+  # Tested (cold, N = 15 / 30, 300 steps): ipopt 40 / 39 iterations, fixed 10 -> 40 / 43, fixed 1 -> 40 / 50, fixed 0.1 -> 42 / 52.
+  dual_init: ipopt
+  dual_init_eq: 0.0
+  dual_init_ineq: 10.0
+  dual_init_bound: 10.0
+  options:
+    tol: 0.00807
+    constr_viol_tol: 7.97e-05
+    compl_inf_tol: 0.0772
+    dual_inf_tol: 1.85
+    acceptable_tol: 2.15e-08
+    acceptable_iter: 15
+    mu_strategy: adaptive
+    adaptive_mu_globalization: never-monotone-mode
+    mu_oracle: quality-function
+    mu_init: 0.144
+    barrier_tol_factor: 7.2
+    mu_linear_decrease_factor: 0.28
+    mu_superlinear_decrease_power: 1.72
+    tau_min: 0.9878
+    kappa_sigma: 312000000000.0
+    bound_push: 0.000513
+    bound_frac: 0.0938
+    slack_bound_push: 0.44
+    slack_bound_frac: 0.0279
+    bound_mult_init_method: constant
+    bound_mult_init_val: 104.0
+    least_square_init_duals: 'no'
+    nlp_scaling_method: none
+    nlp_scaling_max_gradient: 134.0
+    line_search_method: filter
+    alpha_for_y: min
+    alpha_red_factor: 0.578
+    max_soc: 0
+    corrector_type: none
+    watchdog_shortened_iter_trigger: 7
+    accept_every_trial_step: 'no'
+    mehrotra_algorithm: 'no'
+    fast_step_computation: 'yes'
+    min_refinement_steps: 0
+    max_refinement_steps: 10
+    required_infeasibility_reduction: 0.0104
+    theta_max_fact: 1020.0
+    obj_max_inc: 9.98
+    recalc_y: 'no'
+    constraint_violation_norm_type: 1-norm
+    first_hessian_perturbation: 0.00464
+    jacobian_regularization_value: 2.32e-10
+ 
+
+
+acc_settings:
+  spaceDomain: 1             # 0: time domain only, 1: space/time switching (paper Eq. 42)
+  linearDynamics: 0
+  linearInequalities: 0      # 0: cubic speed bounds (paper Eq. 37d, 37e)
+  scaleInequalities: 0
+  use_equality_constraints: 1  # 0: remove the dynamics (SPD system for the linear-solver study)
+
+# Optional overrides of the vehicle / MPC model, e.g.
+# model:
+#   Omega1: 0.01
+#   x1: 1.1
